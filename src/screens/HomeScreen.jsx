@@ -9,12 +9,18 @@ import {
   ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import MapView, { Marker } from 'react-native-maps';
+import useLocation from '../hooks/useLocation'; 
+import PeriodSelector from '../components/PeriodSelector';
 
 export default function HomeScreen({ navigation }) {
-  console.log(navigation);
   const [notes, setNotes] = useState([]);
   const [filter, setFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
+  const [selectedPeriod, setSelectedPeriod] = useState('Tout');
+
+  // Utilisation du hook useLocation pour récupérer la localisation
+  const { location, error } = useLocation();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
@@ -35,20 +41,50 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const filteredNotes = notes.filter((note) => {
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "completed" && note.completed) ||
-      (filter === "pending" && !note.completed) ||
-      (filter === "notes" && note.category === "note") ||
-      (filter === "tasks" && note.category === "tâche");
+  const filterByPeriod = (notes, period) => {
+    const today = new Date();
+    switch (period) {
+      case 'Jour':
+        return notes.filter(note => {
+          const noteDate = new Date(note.date);
+          return noteDate.toDateString() === today.toDateString();
+        });
+      case 'Semaine':
+        const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+        const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+        return notes.filter(note => {
+          const noteDate = new Date(note.date);
+          return noteDate >= startOfWeek && noteDate <= endOfWeek;
+        });
+      case 'Mois':
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return notes.filter(note => {
+          const noteDate = new Date(note.date);
+          return noteDate >= startOfMonth && noteDate <= endOfMonth;
+        });
+      default:
+        return notes; // 'Tout'
+    }
+  };
 
-    const matchesSearch =
-      note.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      note.description.toLowerCase().includes(searchText.toLowerCase());
+  const filteredNotes = filterByPeriod(
+    notes.filter((note) => {
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "completed" && note.completed) ||
+        (filter === "pending" && !note.completed) ||
+        (filter === "notes" && note.category === "note") ||
+        (filter === "tasks" && note.category === "tâche");
 
-    return matchesFilter && matchesSearch;
-  });
+      const matchesSearch =
+        note.title.toLowerCase().includes(searchText.toLowerCase()) ||
+        note.description.toLowerCase().includes(searchText.toLowerCase());
+
+      return matchesFilter && matchesSearch;
+    }),
+    selectedPeriod
+  );
 
   const FilterButton = ({ title, value }) => (
     <TouchableOpacity
@@ -123,6 +159,11 @@ export default function HomeScreen({ navigation }) {
         <FilterButton title="En cours" value="pending" />
       </ScrollView>
 
+      <PeriodSelector
+        selectedPeriod={selectedPeriod}
+        onPeriodChange={setSelectedPeriod}
+      />
+
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate("AddNote")}
@@ -136,6 +177,32 @@ export default function HomeScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         style={styles.list}
       />
+
+      {/* Ajout de la carte ici */}
+      {location && (
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: 0.0922,
+              longitudeDelta: 0.0421,
+            }}
+          >
+            <Marker
+              coordinate={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+              }}
+              title="Votre position"
+            />
+          </MapView>
+        </View>
+      )}
+
+      {/* Affichage des erreurs de localisation */}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -162,10 +229,6 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 5,
     marginRight: 8,
-    // height:90,
-    // flex:1,
-    // alignItems:'center',
-    // justifyContent:'center'
   },
   filterButtonActive: {
     backgroundColor: "#4CAF50",
@@ -234,5 +297,20 @@ const styles = StyleSheet.create({
   noteIcon: {
     fontSize: 12,
     marginTop: 4,
+  },
+  // Styles pour la carte
+  mapContainer: {
+    height: 200, // Ajustez la hauteur selon vos besoins
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  map: {
+    flex: 1,
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginTop: 10,
   },
 });
