@@ -9,6 +9,8 @@ import {
   ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import MapView, { Marker } from 'react-native-maps';
+import useLocation from '../hooks/useLocation'; 
 import PeriodSelector from '../components/PeriodSelector';
 
 export default function HomeScreen({ navigation }) {
@@ -16,6 +18,9 @@ export default function HomeScreen({ navigation }) {
   const [filter, setFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState('Tout');
+
+  // Utilisation du hook useLocation pour récupérer la localisation
+  const { location, error } = useLocation();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
@@ -172,6 +177,32 @@ export default function HomeScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         style={styles.list}
       />
+
+      {/* Ajout de la carte ici */}
+      {location && (
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: 0.0922,
+              longitudeDelta: 0.0421,
+            }}
+          >
+            <Marker
+              coordinate={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+              }}
+              title="Votre position"
+            />
+          </MapView>
+        </View>
+      )}
+
+      {/* Affichage des erreurs de localisation */}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -266,5 +297,20 @@ const styles = StyleSheet.create({
   noteIcon: {
     fontSize: 12,
     marginTop: 4,
+  },
+  // Styles pour la carte
+  mapContainer: {
+    height: 200, // Ajustez la hauteur selon vos besoins
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  map: {
+    flex: 1,
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginTop: 10,
   },
 });
